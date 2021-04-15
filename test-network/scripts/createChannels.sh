@@ -130,4 +130,4 @@ setAnchorPeer1 1
 infoln "Setting anchor peer for org2..."
 setAnchorPeer2 2
 
-successln "Channel '$CHANNEL_NAME' joined"
+successln "Channels '$CHANNEL_NAME'1, '$CHANNEL_NAME'2 joined"
