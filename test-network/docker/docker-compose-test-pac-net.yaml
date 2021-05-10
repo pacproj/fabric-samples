@@ -89,6 +89,7 @@ services:
         - ../organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/msp:/etc/hyperledger/fabric/msp
         - ../organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls:/etc/hyperledger/fabric/tls
         - peer0.org1.example.com:/var/hyperledger/production
+        - ../organizations/packeys/mychannel1:/etc/hyperledger/fabric/pacdata/packeys/mychannel1
     working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
     command: peer node start
     ports:
@@ -126,6 +127,7 @@ services:
         - ../organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/msp:/etc/hyperledger/fabric/msp
         - ../organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls:/etc/hyperledger/fabric/tls
         - peer0.org2.example.com:/var/hyperledger/production
+        - ../organizations/packeys/mychannel2:/etc/hyperledger/fabric/pacdata/packeys/mychannel2
     working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
     command: peer node start
     ports:
@@ -163,6 +165,8 @@ services:
         - ../organizations/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/msp:/etc/hyperledger/fabric/msp
         - ../organizations/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls:/etc/hyperledger/fabric/tls
         - peer0.org3.example.com:/var/hyperledger/production
+        - ../organizations/packeys/mychannel1:/etc/hyperledger/fabric/pacdata/packeys/mychannel1
+        - ../organizations/packeys/mychannel2:/etc/hyperledger/fabric/pacdata/packeys/mychannel2
     working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
     command: peer node start
     ports:

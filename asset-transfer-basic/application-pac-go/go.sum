@@ -135,6 +135,8 @@ github.com/pacproj/fabric-sdk-go v1.0.0-beta3.0.20210412174851-fe5e010930fa h1:y
 github.com/pacproj/fabric-sdk-go v1.0.0-beta3.0.20210412174851-fe5e010930fa/go.mod h1:WBoTD1rMzNkDz+Rss+JHbmqVcKsN9RRMgvwHR0v8Qx4=
 github.com/pacproj/fabric-sdk-go v1.0.0-beta3.0.20210413180833-ad9bc7d746bd h1:KRypLV5Tj58RWHxGjZ/EfqRSl1+wvZ1T0t7ulhaX7fo=
 github.com/pacproj/fabric-sdk-go v1.0.0-beta3.0.20210413180833-ad9bc7d746bd/go.mod h1:21U7vuZ5IwQvy3TrS8EMb1jAkJvfZcRtYVu0HQSSJzA=
+github.com/pacproj/fabric-sdk-go v1.0.0-beta3.0.20210420170914-fd141536631b h1:Oa9cdhfXn1/cWXwruwzxyawO30f/CZiyq5J3WpJiWO8=
+github.com/pacproj/fabric-sdk-go v1.0.0-beta3.0.20210420170914-fd141536631b/go.mod h1:21U7vuZ5IwQvy3TrS8EMb1jAkJvfZcRtYVu0HQSSJzA=
 github.com/pelletier/go-toml v1.1.0 h1:cmiOvKzEunMsAxyhXSzpL5Q1CRKpVv0KQsnAIcSEVYM=
 github.com/pelletier/go-toml v1.1.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/94hg7ilaic=
 github.com/pelletier/go-toml v1.8.0 h1:Keo9qb7iRJs2voHvunFtuuYFsbWeOBh8/P9v/kVMFtw=
