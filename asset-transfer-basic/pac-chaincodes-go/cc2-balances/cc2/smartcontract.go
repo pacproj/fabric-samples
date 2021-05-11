@@ -3,6 +3,7 @@ package cc2
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 )
@@ -14,20 +15,20 @@ type SmartContract struct {
 
 // Account describes basic details of what makes up a simple account
 type Account struct {
-	ID      string  `json:"ID"`
-	Owner   string  `json:"owner"`
-	Balance float64 `json:"balance"`
+	ID      string `json:"ID"`
+	Owner   string `json:"owner"`
+	Balance string `json:"balance"`
 }
 
 // InitLedger adds a base set of accounts to the ledger
 func (s *SmartContract) InitLedger(ctx contractapi.TransactionContextInterface) error {
 	accounts := []Account{
-		{ID: "account1", Owner: "Alice", Balance: 30.87},
-		{ID: "account2", Owner: "Bob", Balance: 4.3},
-		{ID: "account3", Owner: "Carol", Balance: 10},
-		{ID: "account4", Owner: "Max", Balance: 6.192},
-		{ID: "account5", Owner: "Adriana", Balance: 7},
-		{ID: "account6", Owner: "Michel", Balance: 1},
+		{ID: "account1", Owner: "Alice", Balance: "30.87"},
+		{ID: "account2", Owner: "Bob", Balance: "4.3"},
+		{ID: "account3", Owner: "Carol", Balance: "10"},
+		{ID: "account4", Owner: "Max", Balance: "6.192"},
+		{ID: "account5", Owner: "Adriana", Balance: "7"},
+		{ID: "account6", Owner: "Michel", Balance: "1"},
 	}
 
 	for _, account := range accounts {
@@ -46,7 +47,7 @@ func (s *SmartContract) InitLedger(ctx contractapi.TransactionContextInterface) 
 }
 
 // CreateAccount issues a new account to the world state with given details.
-func (s *SmartContract) CreateAccount(ctx contractapi.TransactionContextInterface, id string, owner string, balance float64) error {
+func (s *SmartContract) CreateAccount(ctx contractapi.TransactionContextInterface, id string, owner string, balance string) error {
 	exists, err := s.AccountExists(ctx, id)
 	if err != nil {
 		return err
@@ -88,7 +89,7 @@ func (s *SmartContract) ReadAccount(ctx contractapi.TransactionContextInterface,
 }
 
 // UpdateAccount updates an existing account in the world state with provided parameters.
-func (s *SmartContract) UpdateAccount(ctx contractapi.TransactionContextInterface, id string, owner string, balance float64) error {
+func (s *SmartContract) UpdateAccount(ctx contractapi.TransactionContextInterface, id string, owner string, balance string) error {
 	exists, err := s.AccountExists(ctx, id)
 	if err != nil {
 		return err
@@ -136,17 +137,27 @@ func (s *SmartContract) AccountExists(ctx contractapi.TransactionContextInterfac
 
 // Transfer reduce by Value the Balance field of first given account
 // and increase by Value the Balance field of second given account
-func (s *SmartContract) Transfer(ctx contractapi.TransactionContextInterface, idFrom string, idTo string, Value float64) error {
+func (s *SmartContract) Transfer(ctx contractapi.TransactionContextInterface, idFrom string, idTo string, Value string) error {
 	accountFrom, err := s.ReadAccount(ctx, idFrom)
 	if err != nil {
 		return err
 	}
 
-	if accountFrom.Balance-Value < 0 {
-		return fmt.Errorf("The sender's balance is too small: %+v", accountFrom)
+	bfrom, err := strconv.ParseFloat(accountFrom.Balance, 32)
+	if err != nil {
+		return err
+	}
+	val, err := strconv.ParseFloat(Value, 32)
+	if err != nil {
+		return err
 	}
 
-	accountFrom.Balance -= Value
+	if bfrom-val < 0 {
+		return fmt.Errorf("the sender's balance is too small: %+v", accountFrom)
+	}
+
+	bfrom -= val
+	accountFrom.Balance = fmt.Sprintf("%f", bfrom)
 	accountFromJSON, err := json.Marshal(accountFrom)
 	if err != nil {
 		return err
@@ -157,7 +168,13 @@ func (s *SmartContract) Transfer(ctx contractapi.TransactionContextInterface, id
 		return err
 	}
 
-	accountTo.Balance += Value
+	bto, err := strconv.ParseFloat(accountTo.Balance, 32)
+	if err != nil {
+		return err
+	}
+
+	bto += val
+	accountTo.Balance = fmt.Sprintf("%f", bto)
 	accountToJSON, err := json.Marshal(accountTo)
 	if err != nil {
 		return err
