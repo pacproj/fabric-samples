@@ -10,20 +10,34 @@ TEST_NETWORK_PATH=/home/vano/go/src/github.com/hyperledger/fabric-samples/test-n
 APPLICATION_PATH=/home/vano/go/src/github.com/hyperledger/fabric-samples/asset-transfer-basic/application-pac-go
 #FABRIC_SDK_GO_PATH=...
 
-cd $FABRIC_PROJECT_PATH
+cd $TEST_NETWORK_PATH
 
-#compiling fabric
 set -x
-make clean docker-clean peer-docker orderer-docker tools-docker docker-thirdparty docker native
+./network_pac.sh down
 res=$?
 { set +x; } 2>/dev/null
 if [ $res -ne 0 ]; then
-  fatalln "Failed to compile fabric project"
+  fatalln "Failed to stop running network"
 fi
 
-#copying binaries
-#remember that ca-binaries must be copied there manually as well
-cp  $FABRIC_PROJECT_PATH/build/bin/* $FABRIC_SAMPLES_PATH/bin
+if [[ $1 == fabric ]]; then
+
+  cd $FABRIC_PROJECT_PATH
+  
+  #compiling fabric
+  set -x
+  make clean docker-clean peer-docker orderer-docker tools-docker docker-thirdparty docker native
+  res=$?
+  { set +x; } 2>/dev/null
+  if [ $res -ne 0 ]; then
+    fatalln "Failed to compile fabric project"
+  fi
+  
+  #copying binaries
+  #remember that ca-binaries must be copied there manually as well
+  cp  $FABRIC_PROJECT_PATH/build/bin/* $FABRIC_SAMPLES_PATH/bin
+
+fi
 
 cd $TEST_NETWORK_PATH
 
@@ -93,7 +107,7 @@ if [ $res -ne 0 ]; then
 fi
 
 set -x
-docker logs $ORDERER_ID >& /home/vano/logs/peer0.org3.example.com.log
+docker logs $PEER_ORG3_ID >& /home/vano/logs/peer0.org3.example.com.log
 res=$?
 { set +x; } 2>/dev/null
 if [ $res -ne 0 ]; then

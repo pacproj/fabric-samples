@@ -7,26 +7,29 @@ SPDX-License-Identifier: Apache-2.0
 package main
 
 import (
+	"bytes"
+	"encoding/base64"
+	"encoding/json"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric-protos-go/common"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/msp"
-
-	//"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	mspproviders "github.com/hyperledger/fabric-sdk-go/pkg/common/providers/msp"
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/config"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
+
+	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 )
 
 const (
 	org  = "Org3"
 	user = "User1"
 	caId = "ca.org3.example.com"
-	//caName = "ca-org1"
 )
 
 func main() {
@@ -58,103 +61,51 @@ func main() {
 	tmap["pacpart1"] = []byte("mychannel1")
 	tmap["pacpart2"] = []byte("mychannel2")
 
-	//Send PAC request to mychannel1
+	var stubHashPair *common.HashPair = nil
+
+	//Init ledger in channel1
+	PrintRequest(channel1)
 	resultCh1, err := ch1.Execute(channel.Request{
 		ChaincodeID: "cc1",
 		Fcn:         "InitLedger",
-		/*TransientMap: tmap,
-		PACClientData: fab.ClientData{
-			RequestedTransaction: fab.PACRequest,
-		},*/
 	})
 	if err != nil {
 		log.Fatalf("Failed to Submit transaction: %v", err)
 	}
+	PrintResult(resultCh1, stubHashPair, "InitLedger", "", channel1)
+	//QUERY GetAllAssets
+	readChannelData(ch2, channel2, stubHashPair)
 
-	//TODO: check if Status == 200, then data Message is OK for PAC.
-
-	var mychannel1HashPair *common.HashPair = nil
-	/*message1, err := base64.StdEncoding.DecodeString(gotMessage)
-	if err != nil {
-		log.Fatalf("Failed to decode based64 response message: %v", err)
-	}
-	mychannel1HashPair := common.HashPair{}
-	err = proto.Unmarshal(message1, &mychannel1HashPair)
-	if err != nil {
-		log.Fatal(err)
-	}*/
-
-	PrintResult(resultCh1, mychannel1HashPair, "InitLedger", channel1)
-
-	//query GetAllAssets
-	resultCh1, err = ch1.Query(channel.Request{
-		ChaincodeID: "cc1",
-		Fcn:         "GetAllAssets",
-	}) //QUERY!!!
-	if err != nil {
-		log.Fatalf("Failed to Query transaction: %v", err)
-	}
-	//QUERY!!!
-	//QUERY!!!
-	PrintResult(resultCh1, mychannel1HashPair, "GetAllAssets", channel1)
-
-	//Send PAC request to mychannel2
+	//Init ledger in channel2
+	PrintRequest(channel2)
 	resultCh2, err := ch2.Execute(channel.Request{
 		ChaincodeID: "cc2",
 		Fcn:         "InitLedger",
-		/*TransientMap: tmap,
-		PACClientData: fab.ClientData{
-			RequestedTransaction: fab.PACRequest,
-		},*/
 	})
 	if err != nil {
 		log.Fatalf("Failed to Submit transaction: %v", err)
 	}
-
-	//TODO: check if payload is 200, then the message is OK for PAC
-	/*message2, err := base64.StdEncoding.DecodeString(gotMessage)
-	if err != nil {
-		log.Fatalf("Failed to decode based64 response message: %v", err)
-	}
-	mychannel2HashPair := common.HashPair{}
-	err = proto.Unmarshal(message2, &mychannel2HashPair)
-	if err != nil {
-		log.Fatal(err)
-	}*/
-	var mychannel2HashPair *common.HashPair = nil
-
-	PrintResult(resultCh2, mychannel2HashPair, "InitLedger", channel2)
-
-	//query GetAllAssets
-	resultCh2, err = ch2.Query(channel.Request{
-		ChaincodeID: "cc2",
-		Fcn:         "GetAllAccounts",
-	}) //QUERY!!!
-	if err != nil {
-		log.Fatalf("Failed to Query transaction: %v", err)
-	}
-	//QUERY!!!
-	//QUERY!!!
-
-	PrintResult(resultCh2, mychannel2HashPair, "GetAllAccounts", channel2)
+	PrintResult(resultCh2, stubHashPair, "InitLedger", "", channel2)
+	//QUERY GetAllAccounts
+	readChannelData(ch2, channel2, stubHashPair)
 
 	//Send PAC request to mychannel1
-	resultCh1, err = ch1.Execute(channel.Request{
-		ChaincodeID: "cc1",
-		Fcn:         "TransferAsset",
-		Args:        [][]byte{[]byte("asset4"), []byte("Ivan")},
-		/*TransientMap: tmap,
+	PrintPACRequest(channel1, "INITIAL_REQUEST", "transfer asset4 from Max to Ivan")
+	resp1Ch1, err := ch1.Execute(channel.Request{
+		ChaincodeID:  "cc1",
+		Fcn:          "TransferAsset",
+		Args:         [][]byte{[]byte("asset4"), []byte("Ivan")},
+		TransientMap: tmap,
 		PACClientData: fab.ClientData{
 			RequestedTransaction: fab.PACRequest,
-		},*/
+		},
 	})
 	if err != nil {
 		log.Fatalf("Failed to Submit transaction: %v", err)
 	}
 
 	//TODO: check if Status == 200, then data Message is OK for PAC.
-
-	/*message1, err := base64.StdEncoding.DecodeString(gotMessage)
+	message1, err := base64.StdEncoding.DecodeString(resp1Ch1.Responses[0].ProposalResponse.Response.Message)
 	if err != nil {
 		log.Fatalf("Failed to decode based64 response message: %v", err)
 	}
@@ -162,38 +113,27 @@ func main() {
 	err = proto.Unmarshal(message1, &mychannel1HashPair)
 	if err != nil {
 		log.Fatal(err)
-	}*/
-
-	PrintResult(resultCh1, mychannel1HashPair, "Transfer asset4 from Max to Ivan", channel1)
-
-	//query GetAllAssets
-	resultCh1, err = ch1.Query(channel.Request{
-		ChaincodeID: "cc1",
-		Fcn:         "GetAllAssets",
-	}) //QUERY!!!
-	if err != nil {
-		log.Fatalf("Failed to Query transaction: %v", err)
 	}
-	//QUERY!!!
-	//QUERY!!!
-	PrintResult(resultCh1, mychannel1HashPair, "GetAllAssets", channel1)
+	PrintResult(resp1Ch1, &mychannel1HashPair, "INITIAL_REQUEST", "transfer asset4 from Max to Ivan", channel1)
+	//QUERY GetAllAssets
+	readChannelData(ch1, channel1, &mychannel1HashPair)
 
 	//Send PAC request to mychannel2
-	resultCh2, err = ch2.Execute(channel.Request{
-		ChaincodeID: "cc2",
-		Fcn:         "UpdateAccount",
-		Args:        [][]byte{[]byte("account4"), []byte("Max"), []byte("666.192")},
-		/*TransientMap: tmap,
+	PrintPACRequest(channel2, "INITIAL_REQUEST", "update account4 (+600)")
+	resp1Ch2, err := ch2.Execute(channel.Request{
+		ChaincodeID:  "cc2",
+		Fcn:          "UpdateAccount",
+		Args:         [][]byte{[]byte("account4"), []byte("Max"), []byte("666.192")},
+		TransientMap: tmap,
 		PACClientData: fab.ClientData{
 			RequestedTransaction: fab.PACRequest,
-		},*/
+		},
 	})
 	if err != nil {
 		log.Fatalf("Failed to Submit transaction: %v", err)
 	}
-
 	//TODO: check if payload is 200, then the message is OK for PAC
-	/*message2, err := base64.StdEncoding.DecodeString(gotMessage)
+	message2, err := base64.StdEncoding.DecodeString(resp1Ch2.Responses[0].ProposalResponse.Response.Message)
 	if err != nil {
 		log.Fatalf("Failed to decode based64 response message: %v", err)
 	}
@@ -201,26 +141,160 @@ func main() {
 	err = proto.Unmarshal(message2, &mychannel2HashPair)
 	if err != nil {
 		log.Fatal(err)
-	}*/
-	PrintResult(resultCh2, mychannel2HashPair, "Update account4 (+600)", channel2)
-
-	//query GetAllAssets
-	resultCh2, err = ch2.Query(channel.Request{
-		ChaincodeID: "cc2",
-		Fcn:         "GetAllAccounts",
-	}) //QUERY!!!
-	if err != nil {
-		log.Fatalf("Failed to Query transaction: %v", err)
 	}
-	//QUERY!!!
-	//QUERY!!!
+	PrintResult(resp1Ch2, &mychannel2HashPair, "INITIAL_REQUEST", "update account4 (+600)", channel2)
+	//QUERY GetAllAssets
+	readChannelData(ch2, channel2, &mychannel2HashPair)
 
-	PrintResult(resultCh2, mychannel2HashPair, "GetAllAccounts", channel2)
+	//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	//TODO: implement hashes handling from other shards!!!
+	//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+	PrintPACRequest(channel1, "PREPARE_TX", "transfer asset4 from Max to Ivan")
+	//The PrepareTx creation for shard mychannel1:
+	bcs1 := resp1Ch1.Proposal.PACClientData.BCS
+	resp2Ch1, err := ch1.Execute(channel.Request{
+		ChaincodeID:  "cc1",
+		Fcn:          "TransferAsset",
+		Args:         [][]byte{[]byte("asset4"), []byte("Ivan")},
+		TransientMap: tmap,
+		PACClientData: fab.ClientData{
+			RequestedTransaction: fab.PrepareTxRequest,
+			ValidationData:       []byte(""), //TODO add validation data!
+			BCS:                  bcs1,
+		},
+	})
+	if err != nil {
+		log.Fatalf("Failed to Submit transaction: %v", err)
+	}
+	PrintResult(resp2Ch1, &mychannel1HashPair, "PREPARE_TX", "transfer asset4 from Max to Ivan", channel1)
+
+	//Test sending the same PrepareTx after previous sending
+	//Wrong REPEATED PrepareTx creation for shard mychannel1:
+	//WRONG REPEATED PREPARE_TX!
+	PrintPACRequest(channel1, "WRONG REPEATED PREPARE_TX", "transfer asset4 from Max to Ivan")
+	wrongResp2Ch1, err := ch1.Execute(channel.Request{
+		ChaincodeID:  "cc1",
+		Fcn:          "TransferAsset",
+		Args:         [][]byte{[]byte("asset4"), []byte("Ivan")},
+		TransientMap: tmap,
+		PACClientData: fab.ClientData{
+			RequestedTransaction: fab.PrepareTxRequest,
+			ValidationData:       []byte(""),
+			BCS:                  bcs1,
+		}, //WRONG REPEATED PREPARE_TX!
+	})
+	//WRONG REPEATED PREPARE_TX!
+	if err != nil {
+		log.Printf("Failed to Submit transaction: %v", err)
+	}
+	PrintResult(wrongResp2Ch1, &mychannel1HashPair, "WRONG REPEATED PREPARE_TX", "transfer asset4 from Max to Ivan", channel1)
+
+	//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	//TODO: add test here to check if WSet keys has become locked
+	//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+	//The DecideTx creation for shard mychannel1:
+	PrintPACRequest(channel1, "DECIDE_TX", "transfer asset4 from Max to Ivan")
+	resp3Ch1, err := ch1.Execute(channel.Request{
+		ChaincodeID:  "cc1",
+		Fcn:          "TransferAsset",
+		Args:         [][]byte{[]byte("asset4"), []byte("Ivan")},
+		TransientMap: tmap,
+		PACClientData: fab.ClientData{
+			RequestedTransaction: fab.DecideTxRequest,
+			ValidationData:       []byte(""),
+			BCS:                  bcs1,
+		},
+	})
+	if err != nil {
+		log.Fatalf("Failed to Submit transaction: %v", err)
+	}
+	PrintResult(resp3Ch1, &mychannel1HashPair, "DECIDE_TX", "transfer asset4 from Max to Ivan", channel1)
+
+	//QUERY GetAllAssets
+	readChannelData(ch1, channel1, &mychannel1HashPair)
 
 	client1.Close()
 	client2.Close()
 
 	log.Println("============ application-golang ends ============")
+}
+
+func readChannelData(ch *channel.Client, channelName string, chanHashPair *common.HashPair) {
+	var ccName, ccCommand string
+	if channelName == "mychannel1" {
+		ccName = "cc1"
+		ccCommand = "GetAllAssets"
+	} else {
+		ccName = "cc2"
+		ccCommand = "GetAllAccounts"
+	}
+	resultCh, err := ch.Query(channel.Request{
+		ChaincodeID: ccName,
+		Fcn:         ccCommand,
+	})
+	if err != nil {
+		log.Fatalf("Failed to Query transaction: %v", err)
+	}
+	PrintResult(resultCh, chanHashPair, ccCommand, "", channelName)
+}
+
+func PrintPACRequest(channel string, txType string, requestDescription string) {
+	log.Println("===============================================================")
+	log.Printf("=======================~~~%s~~~========================", channel)
+	log.Println("=================~~~PAC MESSAGE START~~~=======================")
+	log.Printf("===================~~~%s~~~====================", txType)
+	log.Printf("Description: %s", requestDescription)
+	log.Println("===============================================================")
+}
+
+func PrintRequest(channel string) {
+	log.Println("===============================================================")
+	log.Printf("=======================~~~%s~~~========================", channel)
+	log.Println("=================~~~Request start~~~===========================")
+	log.Println("===============================================================")
+	log.Println("===============================================================")
+}
+
+func PrintResult(response channel.Response, chanHashPair *common.HashPair, CCFunc string, CCDescription string, channel string) {
+	gotMessage := response.Responses[0].ProposalResponse.Response.Message
+
+	requestTypeWas := ""
+	if response.Payload != nil {
+		requestTypeWas = "QUERY"
+	} else {
+		requestTypeWas = "INVOKE"
+	}
+
+	log.Printf("\n\n\n\n\n\n\n\n\n\n\n\n")
+	log.Println("===============================================================")
+	log.Println("===============================================================")
+	log.Println("===============================================================")
+	log.Printf("~~~~~~~~~~~~~~~~~~~  %s:   %s   ~~~~~~~~~~~~~~~~~~~~~", requestTypeWas, CCFunc)
+	log.Printf("DESCRIPTION: %s", CCDescription)
+	log.Printf("TX_VALIDATION_CODE %d: %s", response.TxValidationCode, response.TxValidationCode.String())
+	log.Println("===============================================================")
+	log.Printf("=======================~~~%s~~~========================", channel)
+	log.Println("=======================~~~Request end~~~=======================")
+
+	var prettyPayload bytes.Buffer
+	err := json.Indent(&prettyPayload, response.Payload, "", "\t")
+	if err != nil {
+		log.Println("Error getting pretty payload:", err)
+	}
+	log.Printf("\n\nresult.Payload is:\n %s", prettyPayload)
+	log.Printf("--> Channel %s was requested Transaction for CC func: %s, ", channel, CCFunc)
+	log.Printf("Response.Message is:\n%s\n", gotMessage)
+	log.Printf("Full response struct: [%+v]", response.Responses[0].ProposalResponse.Response)
+	log.Println("Vsr, Nsr struct:")
+	if chanHashPair != nil {
+		log.Printf("Struct:[%v], where\n Vsr: [%s], Nsr: [%s]", chanHashPair, chanHashPair.HashedVsr, chanHashPair.HashedNsr)
+	} else {
+		log.Printf("u didn't use PAC request")
+	}
 }
 
 type fabricClient struct {
@@ -316,25 +390,5 @@ func getCertAndKey() *MSPIdentity {
 	return &MSPIdentity{
 		key:  key,
 		cert: cert,
-	}
-}
-
-func PrintResult(response channel.Response, chanHashPair *common.HashPair, CCFunc string, channel string) {
-	gotMessage := response.Responses[0].ProposalResponse.Response.Message
-
-	log.Printf("\n\n\n\n\n\n\n\n\n\n\n\n")
-	log.Println("===============================================================")
-	log.Printf("=======================~~~%s~~~========================", channel)
-	log.Println("===============================================================")
-	log.Println("\n\n\nresult.Payload here: ", string(response.Payload))
-	log.Printf("--> Channel %s was requested Transaction for CC func: %s, ", channel, CCFunc)
-	log.Printf("Response.Message is:\n%s\n", gotMessage)
-	log.Printf("Full response struct: [%+v]", response.Responses[0].ProposalResponse.Response)
-	log.Println("Transaction status:", response.TxValidationCode.String())
-	log.Println("Vsr, Nsr struct:")
-	if chanHashPair != nil {
-		log.Printf("Struct:[%v], where\n Vsr: [%s], Nsr: [%s]", chanHashPair, chanHashPair.HashedVsr, chanHashPair.HashedNsr)
-	} else {
-		log.Printf("u didn't use PAC request")
 	}
 }
