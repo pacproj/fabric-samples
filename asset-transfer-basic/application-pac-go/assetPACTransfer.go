@@ -74,7 +74,7 @@ func main() {
 	}
 	PrintResult(resultCh1, stubHashPair, "InitLedger", "", channel1)
 	//QUERY GetAllAssets
-	readChannelData(ch2, channel2, stubHashPair)
+	readChannelData(ch1, channel1, stubHashPair)
 
 	//Init ledger in channel2
 	PrintRequest(channel2)
@@ -105,15 +105,12 @@ func main() {
 	}
 
 	//TODO: check if Status == 200, then data Message is OK for PAC.
-	message1, err := base64.StdEncoding.DecodeString(resp1Ch1.Responses[0].ProposalResponse.Response.Message)
+	mychannel1HashPair := getShardHashPair(resp1Ch1.Responses[0].ProposalResponse.Response.Message)
+	mychannel1HPBytes, err := base64.StdEncoding.DecodeString(resp1Ch1.Responses[0].ProposalResponse.Response.Message)
 	if err != nil {
 		log.Fatalf("Failed to decode based64 response message: %v", err)
 	}
-	mychannel1HashPair := common.HashPair{}
-	err = proto.Unmarshal(message1, &mychannel1HashPair)
-	if err != nil {
-		log.Fatal(err)
-	}
+
 	PrintResult(resp1Ch1, &mychannel1HashPair, "INITIAL_REQUEST", "transfer asset4 from Max to Ivan", channel1)
 	//QUERY GetAllAssets
 	readChannelData(ch1, channel1, &mychannel1HashPair)
@@ -133,14 +130,10 @@ func main() {
 		log.Fatalf("Failed to Submit transaction: %v", err)
 	}
 	//TODO: check if payload is 200, then the message is OK for PAC
-	message2, err := base64.StdEncoding.DecodeString(resp1Ch2.Responses[0].ProposalResponse.Response.Message)
+	mychannel2HashPair := getShardHashPair(resp1Ch2.Responses[0].ProposalResponse.Response.Message)
+	mychannel2HPBytes, err := base64.StdEncoding.DecodeString(resp1Ch2.Responses[0].ProposalResponse.Response.Message)
 	if err != nil {
 		log.Fatalf("Failed to decode based64 response message: %v", err)
-	}
-	mychannel2HashPair := common.HashPair{}
-	err = proto.Unmarshal(message2, &mychannel2HashPair)
-	if err != nil {
-		log.Fatal(err)
 	}
 	PrintResult(resp1Ch2, &mychannel2HashPair, "INITIAL_REQUEST", "update account4 (+600)", channel2)
 	//QUERY GetAllAssets
@@ -152,10 +145,57 @@ func main() {
 	//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-	PrintPACRequest(channel1, "PREPARE_TX", "transfer asset4 from Max to Ivan")
-	//The PrepareTx creation for shard mychannel1:
+	//add hash pairs into AC temp map
+	tmap["pacHP"] = []byte("")
+	tmap["pacpart1HP"] = []byte(mychannel1HPBytes)
+	tmap["pacpart2HP"] = []byte(mychannel2HPBytes)
+	//TODO: is it safe to send txids in the open way?
+	//we need to send txid for every channel to update
+	//its corresponding local file with dependency list which name consists of txid
+	tmap["pactxid"] = []byte(resp1Ch1.Proposal.PACClientData.BCS.ResponseProposal.TxnID)
+
+	//The hash pairs spreading to mychannel1:
+	PrintPACRequest(channel1, "SPREAD_HASHPAIRS", "spread HashPairs")
 	bcs1 := resp1Ch1.Proposal.PACClientData.BCS
 	resp2Ch1, err := ch1.Execute(channel.Request{
+		ChaincodeID:  "cc1",
+		Fcn:          "TransferAsset",
+		Args:         [][]byte{[]byte("asset4"), []byte("Ivan")},
+		TransientMap: tmap,
+		PACClientData: fab.ClientData{
+			RequestedTransaction: fab.PACRequest,
+			ValidationData:       []byte(""), //TODO add validation data!
+			BCS:                  bcs1,
+		},
+	})
+	if err != nil {
+		log.Fatalf("Failed to Submit transaction: %v", err)
+	}
+	PrintResult(resp2Ch1, &mychannel1HashPair, "SPREAD_HASHPAIRS", "spread HashPairs", channel1)
+
+	//The hash pairs spreading to mychannel1:
+	tmap["pactxid"] = []byte(resp1Ch2.Proposal.PACClientData.BCS.ResponseProposal.TxnID)
+	PrintPACRequest(channel2, "SPREAD_HASHPAIRS", "spread HashPairs")
+	bcs2 := resp1Ch2.Proposal.PACClientData.BCS
+	resp2Ch2, err := ch2.Execute(channel.Request{
+		ChaincodeID:  "cc2",
+		Fcn:          "UpdateAccount",
+		Args:         [][]byte{[]byte("account4"), []byte("Max"), []byte("666.192")},
+		TransientMap: tmap,
+		PACClientData: fab.ClientData{
+			RequestedTransaction: fab.PACRequest,
+			ValidationData:       []byte(""), //TODO add validation data!
+			BCS:                  bcs2,
+		},
+	})
+	if err != nil {
+		log.Fatalf("Failed to Submit transaction: %v", err)
+	}
+	PrintResult(resp2Ch2, &mychannel2HashPair, "SPREAD_HASHPAIRS", "spread HashPairs", channel2)
+
+	PrintPACRequest(channel1, "PREPARE_TX", "transfer asset4 from Max to Ivan")
+	//The PrepareTx creation for shard mychannel1:
+	resp3Ch1, err := ch1.Execute(channel.Request{
 		ChaincodeID:  "cc1",
 		Fcn:          "TransferAsset",
 		Args:         [][]byte{[]byte("asset4"), []byte("Ivan")},
@@ -169,13 +209,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to Submit transaction: %v", err)
 	}
-	PrintResult(resp2Ch1, &mychannel1HashPair, "PREPARE_TX", "transfer asset4 from Max to Ivan", channel1)
+	PrintResult(resp3Ch1, &mychannel1HashPair, "PREPARE_TX", "transfer asset4 from Max to Ivan", channel1)
 
 	//Test sending the same PrepareTx after previous sending
 	//Wrong REPEATED PrepareTx creation for shard mychannel1:
 	//WRONG REPEATED PREPARE_TX!
 	PrintPACRequest(channel1, "WRONG REPEATED PREPARE_TX", "transfer asset4 from Max to Ivan")
-	wrongResp2Ch1, err := ch1.Execute(channel.Request{
+	wrongResp3Ch1, err := ch1.Execute(channel.Request{
 		ChaincodeID:  "cc1",
 		Fcn:          "TransferAsset",
 		Args:         [][]byte{[]byte("asset4"), []byte("Ivan")},
@@ -190,7 +230,7 @@ func main() {
 	if err != nil {
 		log.Printf("Failed to Submit transaction: %v", err)
 	}
-	PrintResult(wrongResp2Ch1, &mychannel1HashPair, "WRONG REPEATED PREPARE_TX", "transfer asset4 from Max to Ivan", channel1)
+	PrintResult(wrongResp3Ch1, &mychannel1HashPair, "WRONG REPEATED PREPARE_TX", "transfer asset4 from Max to Ivan", channel1)
 
 	//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	//TODO: add test here to check if WSet keys has become locked
@@ -198,7 +238,7 @@ func main() {
 
 	//The DecideTx creation for shard mychannel1:
 	PrintPACRequest(channel1, "DECIDE_TX", "transfer asset4 from Max to Ivan")
-	resp3Ch1, err := ch1.Execute(channel.Request{
+	resp4Ch1, err := ch1.Execute(channel.Request{
 		ChaincodeID:  "cc1",
 		Fcn:          "TransferAsset",
 		Args:         [][]byte{[]byte("asset4"), []byte("Ivan")},
@@ -212,10 +252,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to Submit transaction: %v", err)
 	}
-	PrintResult(resp3Ch1, &mychannel1HashPair, "DECIDE_TX", "transfer asset4 from Max to Ivan", channel1)
+	PrintResult(resp4Ch1, &mychannel1HashPair, "DECIDE_TX", "transfer asset4 from Max to Ivan", channel1)
 
 	//QUERY GetAllAssets
 	readChannelData(ch1, channel1, &mychannel1HashPair)
+
+	//=======================================
+	//======TEST ABORT_TRANSACTION===========
+	//=======================================
+	//checkAbortTransaction(channel1, ch1, tmap)
 
 	client1.Close()
 	client2.Close()
@@ -242,7 +287,21 @@ func readChannelData(ch *channel.Client, channelName string, chanHashPair *commo
 	PrintResult(resultCh, chanHashPair, ccCommand, "", channelName)
 }
 
+func getShardHashPair(message string) common.HashPair {
+	mes, err := base64.StdEncoding.DecodeString(message)
+	if err != nil {
+		log.Fatalf("Failed to decode based64 response message: %v", err)
+	}
+	HashPair := common.HashPair{}
+	err = proto.Unmarshal(mes, &HashPair)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return HashPair
+}
+
 func PrintPACRequest(channel string, txType string, requestDescription string) {
+	log.Printf("\n\n\n\n\n\n\n\n\n\n\n\n")
 	log.Println("===============================================================")
 	log.Printf("=======================~~~%s~~~========================", channel)
 	log.Println("=================~~~PAC MESSAGE START~~~=======================")
@@ -252,6 +311,7 @@ func PrintPACRequest(channel string, txType string, requestDescription string) {
 }
 
 func PrintRequest(channel string) {
+	log.Printf("\n\n\n\n\n\n\n\n\n\n\n\n")
 	log.Println("===============================================================")
 	log.Printf("=======================~~~%s~~~========================", channel)
 	log.Println("=================~~~Request start~~~===========================")
@@ -269,7 +329,6 @@ func PrintResult(response channel.Response, chanHashPair *common.HashPair, CCFun
 		requestTypeWas = "INVOKE"
 	}
 
-	log.Printf("\n\n\n\n\n\n\n\n\n\n\n\n")
 	log.Println("===============================================================")
 	log.Println("===============================================================")
 	log.Println("===============================================================")
@@ -284,6 +343,7 @@ func PrintResult(response channel.Response, chanHashPair *common.HashPair, CCFun
 	err := json.Indent(&prettyPayload, response.Payload, "", "\t")
 	if err != nil {
 		log.Println("Error getting pretty payload:", err)
+		log.Printf("\n\n NOT PRETTY result.Payload is:\n %s", response.Payload)
 	}
 	log.Printf("\n\nresult.Payload is:\n %s", prettyPayload)
 	log.Printf("--> Channel %s was requested Transaction for CC func: %s, ", channel, CCFunc)
@@ -392,3 +452,96 @@ func getCertAndKey() *MSPIdentity {
 		cert: cert,
 	}
 }
+
+/*func checkAbortTransaction(channel1 string, ch1 *channel.Client, tmap map[string][]byte) {
+
+	//TODO: add validation data
+	var stubHashPair *common.HashPair = nil
+	txDescription := "transfer asset1 from Tomoko to John"
+	args := [][]byte{[]byte("asset1"), []byte("John")}
+
+	//Send PAC request to mychannel1 for AbortTx
+	PrintPACRequest(channel1, "INITIAL_REQUEST", txDescription)
+	resp1Ch1, err := ch1.Execute(channel.Request{
+		ChaincodeID:  "cc1",
+		Fcn:          "TransferAsset",
+		Args:         args,
+		TransientMap: tmap,
+		PACClientData: fab.ClientData{
+			RequestedTransaction: fab.PACRequest,
+		},
+	})
+	if err != nil {
+		log.Fatalf("Failed to Submit transaction: %v", err)
+	}
+
+	//TODO: check if Status == 200, then data Message is OK for PAC.
+	message1, err := base64.StdEncoding.DecodeString(resp1Ch1.Responses[0].ProposalResponse.Response.Message)
+	if err != nil {
+		log.Fatalf("Failed to decode based64 response message: %v", err)
+	}
+	mychannel1HashPair := common.HashPair{}
+	err = proto.Unmarshal(message1, &mychannel1HashPair)
+	if err != nil {
+		log.Fatal(err)
+	}
+	PrintResult(resp1Ch1, &mychannel1HashPair, "INITIAL_REQUEST", txDescription, channel1)
+	//QUERY GetAllAssets
+	readChannelData(ch1, channel1, &mychannel1HashPair)
+
+	PrintPACRequest(channel1, "PREPARE_TX", txDescription)
+	//The PrepareTx creation for shard mychannel1:
+	bcs1 := resp1Ch1.Proposal.PACClientData.BCS
+	resp2Ch1, err := ch1.Execute(channel.Request{
+		ChaincodeID:  "cc1",
+		Fcn:          "TransferAsset",
+		Args:         args,
+		TransientMap: tmap,
+		PACClientData: fab.ClientData{
+			RequestedTransaction: fab.PrepareTxRequest,
+			ValidationData:       []byte(""), //TODO add validation data!
+			BCS:                  bcs1,
+		},
+	})
+	if err != nil {
+		log.Fatalf("Failed to Submit transaction: %v", err)
+	}
+	PrintResult(resp2Ch1, &mychannel1HashPair, "PREPARE_TX", txDescription, channel1)
+
+	//The AbortTx creation for shard mychannel1:
+	PrintPACRequest(channel1, "ABORT_TX", txDescription)
+	resp3Ch1, err := ch1.Execute(channel.Request{
+		ChaincodeID:  "cc1",
+		Fcn:          "TransferAsset",
+		Args:         args,
+		TransientMap: tmap,
+		PACClientData: fab.ClientData{
+			RequestedTransaction: fab.AbortTxRequest,
+			ValidationData:       []byte(""),
+			BCS:                  bcs1,
+		},
+	})
+	if err != nil {
+		log.Fatalf("Failed to Submit transaction: %v", err)
+	}
+	PrintResult(resp3Ch1, &mychannel1HashPair, "DECIDE_TX", "transfer asset4 from Max to Ivan", channel1)
+
+	//QUERY GetAllAssets
+	readChannelData(ch1, channel1, stubHashPair)
+
+	//Check that key asset1 is unlocked
+	PrintPACRequest(channel1, "ENDORSEMENT_TX", "!!!transfer asset1 from Tomoko to Pet")
+	//The PrepareTx creation for shard mychannel1:
+	respCh1, err := ch1.Execute(channel.Request{
+		ChaincodeID: "cc1",
+		Fcn:         "TransferAsset",
+		Args:        [][]byte{[]byte("asset1"), []byte("Pet")},
+	})
+	if err != nil {
+		log.Fatalf("Failed to Submit transaction: %v", err)
+	}
+	PrintResult(respCh1, &mychannel1HashPair, "ENDORSEMENT_TX", "transfer asset1 from Tomoko to Pet", channel1)
+
+	//QUERY GetAllAssets
+	readChannelData(ch1, channel1, stubHashPair)
+}*/

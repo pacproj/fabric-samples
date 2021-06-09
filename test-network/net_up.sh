@@ -68,68 +68,7 @@ if [ $res -ne 0 ]; then
 fi
 
 
-cd $APPLICATION_PATH
 
-#running the client application
-set -x
-go run assetPACTransfer.go
-res=$?
-{ set +x; } 2>/dev/null
-if [ $res -ne 0 ]; then
-  fatalln "Failed to run PAC client application"
-fi
-
-#copying docker containers logs
-#ORDERER
-set -x
-ORDERER_ID=`docker inspect --format="{{.Id}}" orderer.example.com`
-res=$?
-{ set +x; } 2>/dev/null
-if [ $res -ne 0 ]; then
-  fatalln "Failed to get docker container id"
-fi
-
-set -x
-docker logs $ORDERER_ID >& /home/vano/logs/orderer.example.com.log
-res=$?
-{ set +x; } 2>/dev/null
-if [ $res -ne 0 ]; then
-  fatalln "Failed to save docker container logs"
-fi
-
-#PEER0_ORG3
-set -x
-PEER_ORG3_ID=`docker inspect --format="{{.Id}}" peer0.org3.example.com`
-res=$?
-{ set +x; } 2>/dev/null
-if [ $res -ne 0 ]; then
-  fatalln "Failed to get docker container id"
-fi
-
-set -x
-docker logs $PEER_ORG3_ID >& /home/vano/logs/peer0.org3.example.com.log
-res=$?
-{ set +x; } 2>/dev/null
-if [ $res -ne 0 ]; then
-  fatalln "Failed to save docker container logs"
-fi
-
-#PEER0_ORG1
-set -x
-PEER_ORG1_ID=`docker inspect --format="{{.Id}}" peer0.org1.example.com`
-res=$?
-{ set +x; } 2>/dev/null
-if [ $res -ne 0 ]; then
-  fatalln "Failed to get docker container id"
-fi
-
-set -x
-docker logs $PEER_ORG1_ID >& /home/vano/logs/peer0.org1.example.com.log
-res=$?
-{ set +x; } 2>/dev/null
-if [ $res -ne 0 ]; then
-  fatalln "Failed to save docker container logs"
-fi
 
 echo "don't forget to stop network using in '${TEST_NETWORK_PATH}' command"
 echo "./network_pac.sh down"
