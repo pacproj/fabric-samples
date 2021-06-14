@@ -11,6 +11,6 @@ require (
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 )
 
-replace github.com/hyperledger/fabric-sdk-go => github.com/pacproj/fabric-sdk-go v1.0.0-beta3.0.20210517105550-affcc8f9ac64
+replace github.com/hyperledger/fabric-sdk-go => github.com/pacproj/fabric-sdk-go v1.0.0-beta3.0.20210614131156-50524dcf4a35
 
 replace github.com/hyperledger/fabric-protos-go => github.com/pacproj/fabric-protos-go v0.0.0-20210413120152-f3382d191db5
